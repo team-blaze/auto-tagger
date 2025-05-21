@@ -46,7 +46,7 @@ def get_current_tag(tags):
     return(str(current_tags[0]))
 
 
-def semver_bump(current_tag, commit_message):
+def semver_bump(current_tag, commit_message, prerelease=None):
     """Loads the most recently created tag from the git repo and parses it into a semver object.
     It is then incremented by a keyword in the commit message. Parsing exceptions are handled in parent function.
 
@@ -63,7 +63,13 @@ def semver_bump(current_tag, commit_message):
         comment_on_pr(f'latest tag ({current_tag}) does not conform to semver ([v]?MAJOR.MINOR.PATCH), failed to bump version')
         exit(1)
 
-    if '#major' in commit_message:
+    if prerelease:
+        if not curr_ver.prerelease:
+            new_ver = curr_ver.bump_patch()
+            new_ver = new_ver.bump_prerelease()
+        else:
+            new_ver = curr_ver.bump_prerelease()
+    elif "#major" in commit_message:
         new_ver = curr_ver.bump_major()
     elif '#minor' in commit_message:
         new_ver = curr_ver.bump_minor()
@@ -132,8 +138,11 @@ def main():
     if len(repo.tags) == 0:
         new_tag = 'v1.0.0'
     else:
+        is_prerelease = os.getenv("INPUT_PRERELEASE", "false").strip().lower() == "true"
         current_tag = get_current_tag(repo.tags)
-        new_tag = semver_bump(current_tag, repo.head.commit.message)
+        new_tag = semver_bump(
+            current_tag, repo.head.commit.message, prerelease=is_prerelease
+        )
 
     if new_tag is not None:
         comment_body = f"This PR has now been tagged as [{new_tag}](https://github.com/{os.getenv('GITHUB_REPOSITORY')}/releases/tag/{new_tag})"
