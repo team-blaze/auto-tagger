@@ -5,7 +5,6 @@ import os
 
 import git
 import semver
-
 from github import Github
 
 
@@ -20,7 +19,9 @@ def setup_git(merge_commit_sha):
         repo (object): git repo object
     """
     repo = git.Repo(os.getcwd())
-    repo.config_writer(config_level='global').set_value('safe', 'directory', os.getcwd())
+    repo.config_writer(config_level="global").set_value(
+        "safe", "directory", os.getcwd()
+    )
     repo.git.checkout(merge_commit_sha)
     return repo
 
@@ -36,14 +37,24 @@ def get_current_tag(tags):
         current_tag (str): string of the latest tag on the latest commit
     """
     sorted_tags = sorted(tags, key=lambda t: t.commit.committed_datetime, reverse=True)
-    current_tags = [tag for tag in sorted_tags if tag.commit.committed_datetime == sorted_tags[0].commit.committed_datetime]
+    current_tags = [
+        tag
+        for tag in sorted_tags
+        if tag.commit.committed_datetime == sorted_tags[0].commit.committed_datetime
+    ]
     if len(current_tags) > 1:
         try:
-            current_tags = sorted(current_tags, key=lambda t: [int(t) for t in str(t).replace('v', '').split('.')], reverse=True)
+            current_tags = sorted(
+                current_tags,
+                key=lambda t: [int(t) for t in str(t).replace("v", "").split(".")],
+                reverse=True,
+            )
         except ValueError:
-            comment_on_pr(f'latest tag ({current_tags}) does not conform to semver ([v]?MAJOR.MINOR.PATCH), failed to bump version')
+            comment_on_pr(
+                f"latest tag ({current_tags}) does not conform to semver ([v]?MAJOR.MINOR.PATCH), failed to bump version"
+            )
             exit(1)
-    return(str(current_tags[0]))
+    return str(current_tags[0])
 
 
 def semver_bump(current_tag, commit_message, prerelease=None):
@@ -58,9 +69,11 @@ def semver_bump(current_tag, commit_message, prerelease=None):
         new_tag (str): string of the new tag post incrementing semver section
     """
     try:
-        curr_ver = semver.VersionInfo.parse(current_tag.replace('v', ''))
+        curr_ver = semver.VersionInfo.parse(current_tag.replace("v", ""))
     except ValueError:
-        comment_on_pr(f'latest tag ({current_tag}) does not conform to semver ([v]?MAJOR.MINOR.PATCH), failed to bump version')
+        comment_on_pr(
+            f"latest tag ({current_tag}) does not conform to semver ([v]?MAJOR.MINOR.PATCH), failed to bump version"
+        )
         exit(1)
 
     if prerelease:
@@ -71,12 +84,12 @@ def semver_bump(current_tag, commit_message, prerelease=None):
             new_ver = curr_ver.bump_prerelease()
     elif "#major" in commit_message:
         new_ver = curr_ver.bump_major()
-    elif '#minor' in commit_message:
+    elif "#minor" in commit_message:
         new_ver = curr_ver.bump_minor()
     else:
         new_ver = curr_ver.bump_patch()
 
-    return f'v{str(new_ver)}' if current_tag.startswith('v') else str(new_ver)
+    return f"v{str(new_ver)}" if current_tag.startswith("v") else str(new_ver)
 
 
 def create_and_push_tag(repo, merge_commit_sha, new_tag):
@@ -93,7 +106,7 @@ def create_and_push_tag(repo, merge_commit_sha, new_tag):
     """
     repo.create_tag(new_tag, ref=merge_commit_sha)
     origin_url = f"https://{os.getenv('GITHUB_ACTOR')}:{os.getenv('GITHUB_TOKEN')}@github.com/{os.getenv('GITHUB_REPOSITORY')}.git"
-    gh_origin = repo.create_remote('github',  origin_url)
+    gh_origin = repo.create_remote("github", origin_url)
     gh_origin.push(new_tag)
 
 
@@ -107,15 +120,15 @@ def comment_on_pr(comment_body):
     Returns:
         None
     """
-    g = Github(os.getenv('GITHUB_TOKEN'))
-    repo = g.get_repo(os.getenv('GITHUB_REPOSITORY'))
+    g = Github(os.getenv("GITHUB_TOKEN"))
+    repo = g.get_repo(os.getenv("GITHUB_REPOSITORY"))
 
-    if os.getenv('GITHUB_PR_NUMBER'):
-        pr_number = int(os.getenv('GITHUB_PR_NUMBER'))
+    if os.getenv("GITHUB_PR_NUMBER"):
+        pr_number = int(os.getenv("GITHUB_PR_NUMBER"))
     else:
-        with open(os.getenv('GITHUB_EVENT_PATH')) as f:
+        with open(os.getenv("GITHUB_EVENT_PATH")) as f:
             event_info = json.loads(f.read())
-        pr_number = event_info['number']
+        pr_number = event_info["number"]
 
     pr = repo.get_pull(pr_number)
     pr.create_issue_comment(body=comment_body)
@@ -131,12 +144,12 @@ def main():
     Returns:
         None
     """
-    repo = setup_git(os.getenv('GITHUB_SHA'))
+    repo = setup_git(os.getenv("GITHUB_SHA"))
 
-    comment_body = ''
+    comment_body = ""
     new_tag = None
     if len(repo.tags) == 0:
-        new_tag = 'v1.0.0'
+        new_tag = "v1.0.0"
     else:
         is_prerelease = os.getenv("INPUT_PRERELEASE", "false").strip().lower() == "true"
         current_tag = get_current_tag(repo.tags)
@@ -146,12 +159,12 @@ def main():
 
     if new_tag is not None:
         comment_body = f"This PR has now been tagged as [{new_tag}](https://github.com/{os.getenv('GITHUB_REPOSITORY')}/releases/tag/{new_tag})"
-        if os.getenv('DRYRUN'):
+        if os.getenv("DRYRUN"):
             print(comment_body)
             exit(0)
-        create_and_push_tag(repo, os.getenv('GITHUB_SHA'), new_tag)
+        create_and_push_tag(repo, os.getenv("GITHUB_SHA"), new_tag)
         comment_on_pr(comment_body)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
