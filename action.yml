@@ -1,5 +1,10 @@
 name: 'Github PR Auto Tagger'
 description: 'increment tag and push it'
+inputs:
+  prerelease:
+    description: 'Should this be a prerelease tag'
+    required: false
+    default: 'false'
 author: 'Ruelala'
 runs:
   using: 'docker'
