@@ -92,7 +92,7 @@ def semver_bump(current_tag, commit_message, prerelease=None):
     return f"v{str(new_ver)}" if current_tag.startswith("v") else str(new_ver)
 
 
-def create_and_push_tag(repo, merge_commit_sha, new_tag):
+def create_and_push_tag(repo, merge_commit_sha, new_tag, commit_message):
     """Creates a new tag from arguments in the git repo and pushes it to github.
     Authentication is handled by environment variables passed in from github actions.
 
@@ -100,6 +100,7 @@ def create_and_push_tag(repo, merge_commit_sha, new_tag):
         repo (object): git repo object
         merge_commit_sha (str): hex sha string of merge commit used to attach tag
         new_tag (str): new tag string to be committed and pushed to remote
+        commit_message: message for the tag
 
     Returns:
         None
@@ -107,7 +108,8 @@ def create_and_push_tag(repo, merge_commit_sha, new_tag):
     commit = repo.commit(merge_commit_sha)
     repo.config_writer().set_value("user", "name", commit.author.name).release()
     repo.config_writer().set_value("user", "email", commit.author.email).release()
-    repo.create_tag(new_tag, ref=merge_commit_sha, message=commit.message)
+
+    repo.create_tag(new_tag, ref=merge_commit_sha, message=commit_message)
     origin_url = f"https://{os.getenv('GITHUB_ACTOR')}:{os.getenv('GITHUB_TOKEN')}@github.com/{os.getenv('GITHUB_REPOSITORY')}.git"
     gh_origin = repo.create_remote("github", origin_url)
     gh_origin.push(new_tag)
@@ -156,16 +158,15 @@ def main():
     else:
         is_prerelease = os.getenv("INPUT_PRERELEASE", "false").strip().lower() == "true"
         current_tag = get_current_tag(repo.tags)
-        new_tag = semver_bump(
-            current_tag, repo.head.commit.message, prerelease=is_prerelease
-        )
+        commit_message = repo.head.commit.message
+        new_tag = semver_bump(current_tag, commit_message, prerelease=is_prerelease)
 
     if new_tag is not None:
         comment_body = f"This PR has now been tagged as [{new_tag}](https://github.com/{os.getenv('GITHUB_REPOSITORY')}/releases/tag/{new_tag})"
         if os.getenv("DRYRUN"):
             print(comment_body)
             exit(0)
-        create_and_push_tag(repo, os.getenv("GITHUB_SHA"), new_tag)
+        create_and_push_tag(repo, os.getenv("GITHUB_SHA"), new_tag, commit_message)
         comment_on_pr(comment_body)
 
 
