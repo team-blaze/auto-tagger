@@ -104,9 +104,10 @@ def create_and_push_tag(repo, merge_commit_sha, new_tag):
     Returns:
         None
     """
-    repo.create_tag(
-        new_tag, ref=merge_commit_sha, message=repo.commit(merge_commit_sha).message
-    )
+    commit = repo.commit(merge_commit_sha)
+    repo.config_writer().set_value("user", "name", commit.author.name).release()
+    repo.config_writer().set_value("user", "email", commit.author.email).release()
+    repo.create_tag(new_tag, ref=merge_commit_sha, message=commit.message)
     origin_url = f"https://{os.getenv('GITHUB_ACTOR')}:{os.getenv('GITHUB_TOKEN')}@github.com/{os.getenv('GITHUB_REPOSITORY')}.git"
     gh_origin = repo.create_remote("github", origin_url)
     gh_origin.push(new_tag)
